@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'radio-pwa-cache-v3'; // Змінили версію кешу для примусового оновлення
+﻿const CACHE_NAME = 'radio-pwa-cache-v3'; // Зберігаємо нову версію кешу
 const urlsToCache = [
   'index.html',
   'styles.css',
@@ -38,6 +38,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         });
       })
+      .catch(() => caches.match('index.html')) // Повертаємо кешовану index.html у разі помилки
   );
 });
 
@@ -57,7 +58,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Відправляємо повідомлення клієнтам про оновлення
+// Відправляємо повідомлення клієнтам про оновлення лише один раз
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CHECK_UPDATE') {
     self.clients.matchAll().then(clients => {
