@@ -4,7 +4,7 @@ const playPauseBtn = document.querySelector(".controls .control-btn:nth-child(2)
 const currentStationInfo = document.getElementById("currentStationInfo");
 let currentIndex = parseInt(localStorage.getItem("lastStation")) || 0;
 let favoriteStations = JSON.parse(localStorage.getItem("favoriteStations")) || [];
-let currentTab = localStorage.getItem("currentTab") || "techno";
+let currentTab = localStorage.getItem("lastTab") || "techno";
 let isPlaying = localStorage.getItem("isPlaying") === "true";
 let stationLists = {};
 let stationItems;
@@ -20,11 +20,10 @@ fetch('stations.json')
 
 // Теми
 const themes = {
-  dark: { bodyBg: "#121212", containerBg: "#1e1e1e", accent: "#00C4FF", text: "#fff" },
+  dark: { bodyBg: "#121212", containerBg: "linear-gradient(135deg, #1e1e1e, #2a2a4a)", accent: "#00C4FF", text: "#fff" },
   light: { bodyBg: "#f0f0f0", containerBg: "#fff", accent: "#007BFF", text: "#000" },
-  neon: { bodyBg: "#0a0a1a", containerBg: "#1a1a2e", accent: "#00ffcc", text: "#fff" },
-  "light-alt": { bodyBg: "#f5f5e6", containerBg: "#fff5e1", accent: "#1e90ff", text: "#333" },
-  "dark-alt": { bodyBg: "#1a1a2a", containerBg: "#2e2e3e", accent: "#00ff00", text: "#e0e0e0" }
+  neon: { bodyBg: "#0a0a1a", containerBg: "linear-gradient(135deg, #1a1a2e, #2e2e4a)", accent: "#00ffcc", text: "#fff" },
+  cyberpunk: { bodyBg: "#0a0a1a", containerBg: "linear-gradient(135deg, #1a1a2e, #2e2e4a)", accent: "#ff00ff", text: "#fff", textShadow: "0 0 5px #ff00ff" }
 };
 let currentTheme = localStorage.getItem("selectedTheme") || "dark";
 
@@ -56,6 +55,7 @@ function applyTheme(theme) {
     el.style.background = themes[theme].containerBg;
     el.style.borderColor = themes[theme].accent;
     el.style.color = themes[theme].text;
+    if (themes[theme].textShadow) el.style.textShadow = themes[theme].textShadow;
   });
   document.querySelectorAll(".station-item").forEach(el => {
     el.style.background = themes[theme].containerBg;
@@ -69,16 +69,21 @@ function applyTheme(theme) {
 }
 
 function toggleTheme() {
-  const themesOrder = ["dark", "light", "neon", "light-alt", "dark-alt"];
-  const nextTheme = themesOrder[(themesOrder.indexOf(currentTheme) + 1) % 5];
+  const themesOrder = ["dark", "light", "neon", "cyberpunk"];
+  const nextTheme = themesOrder[(themesOrder.indexOf(currentTheme) + 1) % 4];
   applyTheme(nextTheme);
 }
 
 function switchTab(tab) {
   if (!["techno", "trance", "ukraine"].includes(tab)) tab = "techno";
   currentTab = tab;
+  if (localStorage.getItem("lastTab") === tab) {
+    currentIndex = parseInt(localStorage.getItem("lastStation")) || 0;
+  } else {
+    currentIndex = 0;
+  }
   localStorage.setItem("currentTab", tab);
-  currentIndex = 0;
+  localStorage.setItem("lastTab", tab);
   updateStationList();
   document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
   document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add("active");
@@ -129,6 +134,9 @@ function changeStation(index) {
   stationItems.forEach(item => item.classList.remove("selected"));
   stationItems[index].classList.add("selected");
   currentIndex = index;
+  currentTab = document.querySelector(".tab-btn.active").getAttribute("onclick").match(/switchTab\('(.+)'\)/)[1];
+  localStorage.setItem("lastStation", index);
+  localStorage.setItem("lastTab", currentTab);
   audio.src = stationItems[index].dataset.value;
   updateCurrentStationInfo(stationItems[index]);
   if (audio.paused) {
@@ -139,7 +147,6 @@ function changeStation(index) {
   if (isPlaying) {
     audio.play().catch(error => console.error("Помилка відтворення:", error));
   }
-  localStorage.setItem("lastStation", index);
 }
 
 function updateCurrentStationInfo(item) {
@@ -180,6 +187,24 @@ function togglePlayPause() {
   localStorage.setItem("isPlaying", isPlaying);
 }
 
+function handleBluetoothConnection(event) {
+  if (event.type === "connect" && navigator.bluetooth && currentIndex >= 0) {
+    audio.src = stationItems[currentIndex].dataset.value;
+    audio.play().catch(error => console.error("Помилка відтворення:", error));
+    isPlaying = true;
+    localStorage.setItem("isPlaying", isPlaying);
+    playPauseBtn.textContent = "⏸";
+    document.querySelectorAll(".wave-bar").forEach(bar => bar.style.animationPlayState = "running");
+  } else if (event.type === "disconnect") {
+    audio.pause();
+    isPlaying = false;
+    localStorage.setItem("isPlaying", isPlaying);
+    playPauseBtn.textContent = "▶";
+    document.querySelectorAll(".wave-bar").forEach(bar => bar.style.animationPlayState = "paused");
+    alert("Bluetooth відключено. Відтворення призупинено.");
+  }
+}
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") prevStation();
   if (e.key === "ArrowRight") nextStation();
@@ -189,10 +214,9 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-function handleBluetoothConnection() {
-  if (navigator.bluetooth && !audio.paused) {
-    audio.play().catch(error => console.error("Помилка відтворення:", error));
-  }
+if (navigator.bluetooth) {
+  navigator.bluetooth.addEventListener('connect', handleBluetoothConnection);
+  navigator.bluetooth.addEventListener('disconnect', handleBluetoothConnection);
 }
 
 navigator.mediaSession.setActionHandler("previoustrack", () => prevStation());
@@ -202,10 +226,15 @@ navigator.mediaSession.setActionHandler("pause", () => togglePlayPause());
 
 applyTheme(currentTheme);
 window.addEventListener("blur", () => {
-  if (document.hidden) localStorage.setItem("lastStation", currentIndex);
+  if (document.hidden) {
+    localStorage.setItem("lastStation", currentIndex);
+    localStorage.setItem("lastTab", currentTab);
+  }
 });
 window.addEventListener("visibilitychange", () => {
-  if (!document.hidden && navigator.bluetooth) handleBluetoothConnection();
+  if (!document.hidden && navigator.bluetooth) {
+    handleBluetoothConnection({ type: "connect" });
+  }
 });
 
 audio.addEventListener("playing", () => {
@@ -223,6 +252,15 @@ audio.addEventListener("pause", () => {
 audio.addEventListener("error", () => console.error("Помилка трансляції"));
 audio.volume = 0.5;
 
-if (isPlaying) {
-  audio.play().catch(error => console.error("Помилка автовідтворення:", error));
-}
+const volumeSlider = document.getElementById("volumeSlider");
+volumeSlider.addEventListener("input", (e) => {
+  audio.volume = e.target.value;
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  currentTab = localStorage.getItem("lastTab") || "techno";
+  switchTab(currentTab);
+  if (isPlaying) {
+    audio.play().catch(error => console.error("Помилка автовідтворення:", error));
+  }
+});
