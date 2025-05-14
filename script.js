@@ -8,6 +8,7 @@ let currentTab = localStorage.getItem("lastTab") || "techno";
 let isPlaying = localStorage.getItem("isPlaying") === "true";
 let stationLists = {};
 let stationItems;
+let hasReloaded = false; // Додаємо прапорець для уникнення повторного перезавантаження
 
 // Завантаження станцій із JSON
 fetch('stations.json')
@@ -37,13 +38,26 @@ if ('serviceWorker' in navigator) {
     registration.addEventListener('updatefound', () => {
       const newWorker = registration.installing;
       newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          if (confirm('Доступна нова версія радіо. Оновити?')) {
-            window.location.reload();
-          }
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller && !hasReloaded) {
+          // Автоматичне оновлення сторінки лише один раз
+          hasReloaded = true;
+          window.location.reload();
         }
       });
     });
+
+    // Перевірка оновлень при завантаженні
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.active.postMessage({ type: 'CHECK_UPDATE' });
+    });
+  });
+
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'UPDATE_AVAILABLE' && !hasReloaded) {
+      // Автоматичне оновлення сторінки лише один раз
+      hasReloaded = true;
+      window.location.reload();
+    }
   });
 }
 
