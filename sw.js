@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'radio-pwa-cache-v3'; // Зберігаємо нову версію кешу
+﻿const CACHE_NAME = 'radio-pwa-cache-v2';
 const urlsToCache = [
   'index.html',
   'styles.css',
@@ -15,7 +15,6 @@ self.addEventListener('install', (event) => {
       .then((cache) => {
         return cache.addAll(urlsToCache);
       })
-      .then(() => self.skipWaiting()) // Примусово активуємо новий Service Worker
   );
 });
 
@@ -38,7 +37,6 @@ self.addEventListener('fetch', (event) => {
           return response;
         });
       })
-      .catch(() => caches.match('index.html')) // Повертаємо кешовану index.html у разі помилки
   );
 });
 
@@ -54,15 +52,5 @@ self.addEventListener('activate', (event) => {
         })
       );
     })
-    .then(() => self.clients.claim()) // Примусово беремо контроль над усіма вкладками
   );
-});
-
-// Відправляємо повідомлення клієнтам про оновлення лише один раз
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'CHECK_UPDATE') {
-    self.clients.matchAll().then(clients => {
-      clients.forEach(client => client.postMessage({ type: 'UPDATE_AVAILABLE' }));
-    });
-  }
 });
