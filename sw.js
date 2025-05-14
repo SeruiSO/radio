@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'radio-pwa-cache-v2';
+const CACHE_NAME = 'radio-pwa-cache-' + __BUILD_ID__;
 const urlsToCache = [
   'index.html',
   'styles.css',
@@ -18,7 +18,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', (event) k=> {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

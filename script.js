@@ -1,10 +1,10 @@
-﻿const audio = document.getElementById("audioPlayer");
+const audio = document.getElementById("audioPlayer");
 const stationList = document.getElementById("stationList");
 const playPauseBtn = document.querySelector(".controls .control-btn:nth-child(2)");
 const currentStationInfo = document.getElementById("currentStationInfo");
-let currentIndex = parseInt(localStorage.getItem("lastStation")) || 0;
+let currentIndex = parseInt(localStorage.getItem("lastStationIndex")) || 0;
 let favoriteStations = JSON.parse(localStorage.getItem("favoriteStations")) || [];
-let currentTab = localStorage.getItem("currentTab") || "techno";
+let currentTab = localStorage.getItem("lastStationTab") || "techno";
 let isPlaying = localStorage.getItem("isPlaying") === "true";
 let stationLists = {};
 let stationItems;
@@ -14,17 +14,40 @@ fetch('stations.json')
   .then(response => response.json())
   .then(data => {
     stationLists = data;
-    switchTab(currentTab);
+    switchTab(currentTab); // Відновлення останньої вкладки
+    if (isPlaying) {
+      playWithRetry(audio.src, 3, 2000); // Автовідтворення останньої станції
+    }
   })
   .catch(error => console.error("Помилка завантаження станцій:", error));
 
+// Функція для відтворення з повторними спробами
+async function playWithRetry(url, retries, delay) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      audio.src = url;
+      await audio.play();
+      isPlaying = true;
+      playPauseBtn.textContent = "⏸";
+      document.querySelectorAll(".wave-bar").forEach(bar => bar.style.animationPlayState = "running");
+      localStorage.setItem("isPlaying", isPlaying);
+      return;
+    } catch (error) {
+      console.error(`Спроба ${i + 1} не вдалася:`, error);
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  console.error("Не вдалося відтворити станцію після всіх спроб");
+}
+
 // Теми
 const themes = {
-  dark: { bodyBg: "#121212", containerBg: "#1e1e1e", accent: "#00C4FF", text: "#fff" },
-  light: { bodyBg: "#f0f0f0", containerBg: "#fff", accent: "#007BFF", text: "#000" },
-  neon: { bodyBg: "#0a0a1a", containerBg: "#1a1a2e", accent: "#00ffcc", text: "#fff" },
-  "light-alt": { bodyBg: "#f5f5e6", containerBg: "#fff5e1", accent: "#1e90ff", text: "#333" },
-  "dark-alt": { bodyBg: "#1a1a2a", containerBg: "#2e2e3e", accent: "#00ff00", text: "#e0e0e0" }
+  dark: { bodyBg: "#121212", containerBg: "#1e1e1e", accent: "#00C4FF", text: "#fff", font: "'Roboto', sans-serif" },
+  light: { bodyBg: "#f0f0f0", containerBg: "#fff", accent: "#007BFF", text: "#000", font: "'Roboto', sans-serif" },
+  neon: { bodyBg: "#0a0a1a", containerBg: "#1a1a2e", accent: "#00ffcc", text: "#fff", font: "'Roboto', sans-serif" },
+  monochrome: { bodyBg: "#000", containerBg: "#222", accent: "#fff", text: "#fff", font: "'Roboto', sans-serif" }
 };
 let currentTheme = localStorage.getItem("selectedTheme") || "dark";
 
@@ -50,17 +73,20 @@ if ('serviceWorker' in navigator) {
 
 function applyTheme(theme) {
   document.body.style.background = themes[theme].bodyBg;
+  document.body.style.fontFamily = themes[theme].font;
   document.querySelector(".container").style.background = themes[theme].containerBg;
   document.querySelector("h1").style.color = themes[theme].accent;
   document.querySelectorAll(".station-list, .control-btn, .theme-toggle, .current-station-info, .tab-btn").forEach(el => {
     el.style.background = themes[theme].containerBg;
     el.style.borderColor = themes[theme].accent;
     el.style.color = themes[theme].text;
+    el.style.fontFamily = themes[theme].font;
   });
   document.querySelectorAll(".station-item").forEach(el => {
     el.style.background = themes[theme].containerBg;
     el.style.borderColor = themes[theme].text;
     el.style.color = themes[theme].text;
+    el.style.fontFamily = themes[theme].font;
   });
   document.querySelector(".controls-container").style.background = themes[theme].containerBg;
   document.querySelector(".controls-container").style.borderColor = themes[theme].accent;
@@ -69,15 +95,15 @@ function applyTheme(theme) {
 }
 
 function toggleTheme() {
-  const themesOrder = ["dark", "light", "neon", "light-alt", "dark-alt"];
-  const nextTheme = themesOrder[(themesOrder.indexOf(currentTheme) + 1) % 5];
+  const themesOrder = ["dark", "light", "neon", "monochrome"];
+  const nextTheme = themesOrder[(themesOrder.indexOf(currentTheme) + 1) % 4];
   applyTheme(nextTheme);
 }
 
 function switchTab(tab) {
   if (!["techno", "trance", "ukraine"].includes(tab)) tab = "techno";
   currentTab = tab;
-  localStorage.setItem("currentTab", tab);
+  localStorage.setItem("lastStationTab", tab);
   currentIndex = 0;
   updateStationList();
   document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
@@ -129,17 +155,16 @@ function changeStation(index) {
   stationItems.forEach(item => item.classList.remove("selected"));
   stationItems[index].classList.add("selected");
   currentIndex = index;
-  audio.src = stationItems[index].dataset.value;
+  const stationUrl = stationItems[index].dataset.value;
   updateCurrentStationInfo(stationItems[index]);
-  if (audio.paused) {
-    document.querySelectorAll(".wave-bar").forEach(bar => bar.style.animationPlayState = "paused");
-  } else {
-    document.querySelectorAll(".wave-bar").forEach(bar => bar.style.animationPlayState = "running");
-  }
   if (isPlaying) {
-    audio.play().catch(error => console.error("Помилка відтворення:", error));
+    playWithRetry(stationUrl, 3, 2000);
+  } else {
+    audio.src = stationUrl;
+    document.querySelectorAll(".wave-bar").forEach(bar => bar.style.animationPlayState = "paused");
   }
-  localStorage.setItem("lastStation", index);
+  localStorage.setItem("lastStationIndex", index);
+  localStorage.setItem("lastStationTab", currentTab);
 }
 
 function updateCurrentStationInfo(item) {
@@ -167,17 +192,14 @@ function nextStation() {
 
 function togglePlayPause() {
   if (audio.paused) {
-    audio.play().catch(error => console.error("Помилка відтворення:", error));
-    playPauseBtn.textContent = "⏸";
-    document.querySelectorAll(".wave-bar").forEach(bar => bar.style.animationPlayState = "running");
-    isPlaying = true;
+    playWithRetry(audio.src, 3, 2000);
   } else {
     audio.pause();
     playPauseBtn.textContent = "▶";
     document.querySelectorAll(".wave-bar").forEach(bar => bar.style.animationPlayState = "paused");
     isPlaying = false;
+    localStorage.setItem("isPlaying", isPlaying);
   }
-  localStorage.setItem("isPlaying", isPlaying);
 }
 
 document.addEventListener("keydown", (e) => {
@@ -190,8 +212,8 @@ document.addEventListener("keydown", (e) => {
 });
 
 function handleBluetoothConnection() {
-  if (navigator.bluetooth && !audio.paused) {
-    audio.play().catch(error => console.error("Помилка відтворення:", error));
+  if (navigator.bluetooth && isPlaying) {
+    playWithRetry(audio.src, 3, 2000);
   }
 }
 
@@ -202,7 +224,10 @@ navigator.mediaSession.setActionHandler("pause", () => togglePlayPause());
 
 applyTheme(currentTheme);
 window.addEventListener("blur", () => {
-  if (document.hidden) localStorage.setItem("lastStation", currentIndex);
+  if (document.hidden) {
+    localStorage.setItem("lastStationIndex", currentIndex);
+    localStorage.setItem("lastStationTab", currentTab);
+  }
 });
 window.addEventListener("visibilitychange", () => {
   if (!document.hidden && navigator.bluetooth) handleBluetoothConnection();
@@ -222,7 +247,3 @@ audio.addEventListener("pause", () => {
 });
 audio.addEventListener("error", () => console.error("Помилка трансляції"));
 audio.volume = 0.5;
-
-if (isPlaying) {
-  audio.play().catch(error => console.error("Помилка автовідтворення:", error));
-}
