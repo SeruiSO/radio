@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'radio-pwa-cache-v2';
+﻿const CACHE_NAME = 'radio-pwa-cache-v3'; // Змінили версію кешу для примусового оновлення
 const urlsToCache = [
   'index.html',
   'styles.css',
@@ -15,6 +15,7 @@ self.addEventListener('install', (event) => {
       .then((cache) => {
         return cache.addAll(urlsToCache);
       })
+      .then(() => self.skipWaiting()) // Примусово активуємо новий Service Worker
   );
 });
 
@@ -52,5 +53,15 @@ self.addEventListener('activate', (event) => {
         })
       );
     })
+    .then(() => self.clients.claim()) // Примусово беремо контроль над усіма вкладками
   );
+});
+
+// Відправляємо повідомлення клієнтам про оновлення
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'CHECK_UPDATE') {
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => client.postMessage({ type: 'UPDATE_AVAILABLE' }));
+    });
+  }
 });

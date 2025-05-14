@@ -38,12 +38,23 @@ if ('serviceWorker' in navigator) {
       const newWorker = registration.installing;
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          if (confirm('Доступна нова версія радіо. Оновити?')) {
-            window.location.reload();
-          }
+          // Автоматичне оновлення сторінки
+          window.location.reload();
         }
       });
     });
+
+    // Перевірка оновлень при завантаженні
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.active.postMessage({ type: 'CHECK_UPDATE' });
+    });
+  });
+
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+      // Автоматичне оновлення сторінки
+      window.location.reload();
+    }
   });
 }
 
