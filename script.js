@@ -10,7 +10,7 @@ let stationLists = {};
 let stationItems;
 
 // Завантаження станцій із JSON
-fetch('/stations.json')
+fetch('stations.json')
   .then(response => response.json())
   .then(data => {
     stationLists = data;
@@ -30,7 +30,7 @@ let currentTheme = localStorage.getItem("selectedTheme") || "dark";
 
 // Налаштування Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').then((registration) => {
+  navigator.serviceWorker.register('sw.js').then((registration) => {
     setInterval(() => {
       registration.update();
     }, 5 * 60 * 1000); // Перевірка оновлень кожні 5 хвилин
