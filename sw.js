@@ -1,4 +1,4 @@
-const CACHE_NAME = 'radio-pwa-cache-v4';
+﻿const CACHE_NAME = 'radio-pwa-cache-v2';
 const urlsToCache = [
   'index.html',
   'styles.css',
@@ -6,8 +6,7 @@ const urlsToCache = [
   'stations.json',
   'manifest.json',
   'icon-192.png',
-  'icon-512.png',
-  'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap'
+  'icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -36,10 +35,6 @@ self.addEventListener('fetch', (event) => {
               cache.put(event.request, responseToCache);
             });
           return response;
-        }).catch(() => {
-          if (event.request.url.includes('stations.json')) {
-            return caches.match('stations.json');
-          }
         });
       })
   );
